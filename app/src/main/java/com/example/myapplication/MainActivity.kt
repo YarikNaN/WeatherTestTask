@@ -1,7 +1,10 @@
 package com.example.myapplication
 import android.content.Context
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.text.Html
+import android.text.method.LinkMovementMethod
 import android.util.Log
 import android.view.View
 import android.widget.ArrayAdapter
@@ -56,11 +59,23 @@ class MainActivity : AppCompatActivity() {
                     if (response.isSuccessful) {
                         val binInfo = response.body()
                         if (binInfo != null) {
-                            binInfoTextView.text = binInfo.toString()
+                            // Собираем строку в переменную binInfoString
+                            val binInfoString = binInfo.toString()
+
+                            // Заменяем строку "Country" на кликабельную ссылку
+                            val countryName = binInfo.country?.name ?: "N/A"
+                            val googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=$countryName"
+                            val countryLink = "<a href=\"$googleMapsUrl\">$countryName</a>"
+                            val binInfoStringWithLink = binInfoString.replace("Country: $countryName", "Country: $countryLink")
+
+                            // Отображаем на экране
+                            binInfoTextView.text = Html.fromHtml(binInfoStringWithLink)
+
+                            // Добавляем в список
                             binInfoList.add(binInfo)
                             binInfoAdapter.notifyDataSetChanged()
                             binInfoListView.smoothScrollToPosition(binInfoAdapter.count - 1)
-                            saveHistory() // Save updated history list to shared preferences
+                            saveHistory()
                             Log.d("RESPONSE_BODY", response.body().toString())
                         } else {
                             Toast.makeText(this@MainActivity, "Error: Response body is null", Toast.LENGTH_SHORT).show()
@@ -68,13 +83,21 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         Toast.makeText(this@MainActivity, "Error: ${response.code()}", Toast.LENGTH_SHORT).show()
                     }
+
                 }
+
 
                 override fun onFailure(call: Call<BinInfo>, t: Throwable) {
                     Toast.makeText(this@MainActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
                 }
             })
         }
+
+        // Добавьте следующий код в метод onCreate() вашей активности
+
+
+
+
 
         historyButton.setOnClickListener {
             binInfoListView.visibility = if (binInfoListView.visibility == View.VISIBLE) {

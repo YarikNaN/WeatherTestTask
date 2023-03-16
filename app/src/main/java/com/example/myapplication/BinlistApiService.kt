@@ -111,3 +111,4 @@ object BinListApiClient {
     val apiService = retrofit.create(BinListApiService::class.java)
 }
 
+
