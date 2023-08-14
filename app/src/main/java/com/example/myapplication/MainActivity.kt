@@ -1,122 +1,55 @@
 package com.example.myapplication
-import android.content.Context
-import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
+
 import android.os.Bundle
-import android.text.Html
-import android.text.method.LinkMovementMethod
 import android.util.Log
-import android.view.View
-import android.widget.ArrayAdapter
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.example.weathertesttask.WeatherResponse
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
-import android.widget.Button
-import android.widget.EditText
-import android.widget.ListView
-import android.widget.TextView
-import android.widget.Toast
-import com.google.firebase.crashlytics.buildtools.reloc.com.google.common.reflect.TypeToken
-import com.google.gson.Gson
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binEditText: EditText
-    private lateinit var getBinInfoButton: Button
-    private lateinit var binInfoListView: ListView
-    private lateinit var binInfoTextView: TextView
-    private lateinit var binInfoAdapter: ArrayAdapter<BinInfo>
-    private lateinit var binInfoList: MutableList<BinInfo>
-    private lateinit var historyButton: Button
+    private val apiKey = "af3999ef32664927875125626231108"
+    private val city = "moscow"
+    private val days = 5
+
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var weatherAdapter: WeatherAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        binEditText = findViewById(R.id.bin_input)
-        getBinInfoButton = findViewById(R.id.lookup_button)
-        binInfoListView = findViewById(R.id.binInfoListView)
-        historyButton = findViewById(R.id.historyButton)
-        binInfoTextView = findViewById(R.id.bin_info)
+        recyclerView = findViewById(R.id.recyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        weatherAdapter = WeatherAdapter()
+        recyclerView.adapter = weatherAdapter
 
-        // Retrieve history list from shared preferences
-        val sharedPreferences = getSharedPreferences("bin_info_history", Context.MODE_PRIVATE)
-        val historyString = sharedPreferences.getString("history", null)
-        binInfoList = if (historyString != null) {
-            Gson().fromJson(historyString, object : TypeToken<MutableList<BinInfo>>() {}.type)
-        } else {
-            mutableListOf()
-        }
-        binInfoAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, binInfoList)
-        binInfoListView.adapter = binInfoAdapter
-
-        getBinInfoButton.setOnClickListener {
-            val bin = binEditText.text.toString()
-            val call = BinListApiClient.apiService.getBinInfo(bin)
-            call.enqueue(object : Callback<BinInfo> {
-
-                override fun onResponse(call: Call<BinInfo>, response: Response<BinInfo>) {
-                    if (response.isSuccessful) {
-                        val binInfo = response.body()
-                        if (binInfo != null) {
-                            // Собираем строку в переменную binInfoString
-                            val binInfoString = binInfo.toString()
-
-                            // Заменяем строку "Country" на кликабельную ссылку
-                            val countryName = binInfo.country?.name ?: "N/A"
-                            val googleMapsUrl = "https://www.google.com/maps/search/?api=1&query=$countryName"
-                            val countryLink = "<a href=\"$googleMapsUrl\">$countryName</a>"
-                            val binInfoStringWithLink = binInfoString.replace("Country: $countryName", "Country: $countryLink")
-
-                            // Отображаем на экране
-                            binInfoTextView.text = Html.fromHtml(binInfoStringWithLink)
-
-                            // Добавляем в список
-                            binInfoList.add(binInfo)
-                            binInfoAdapter.notifyDataSetChanged()
-                            binInfoListView.smoothScrollToPosition(binInfoAdapter.count - 1)
-                            saveHistory()
-                            Log.d("RESPONSE_BODY", response.body().toString())
-                        } else {
-                            Toast.makeText(this@MainActivity, "Error: Response body is null", Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        Toast.makeText(this@MainActivity, "Error: ${response.code()}", Toast.LENGTH_SHORT).show()
-                    }
-
-                }
-
-
-                override fun onFailure(call: Call<BinInfo>, t: Throwable) {
-                    Toast.makeText(this@MainActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
-                }
-            })
-        }
-
-        // Добавьте следующий код в метод onCreate() вашей активности
-
-
-
-
-
-        historyButton.setOnClickListener {
-            binInfoListView.visibility = if (binInfoListView.visibility == View.VISIBLE) {
-                View.GONE
-            } else {
-                View.VISIBLE
-            }
-            historyButton.text = if (binInfoListView.visibility == View.VISIBLE) {
-                "Скрыть историю запросов"
-            } else {
-                "Показать историю запросов"
-            }
-        }
+        fetchWeatherData()
     }
 
-    private fun saveHistory() {
-        val sharedPreferences = getSharedPreferences("bin_info_history", Context.MODE_PRIVATE)
-        val historyString = Gson().toJson(binInfoList)
-        sharedPreferences.edit().putString("history", historyString).apply()
+    private fun fetchWeatherData() {
+        val call = RetrofitClient.apiService.getWeatherForecast(city, days, apiKey)
+
+        call.enqueue(object : Callback<WeatherResponse> {
+            override fun onResponse(call: Call<WeatherResponse>, response: Response<WeatherResponse>) {
+                if (response.isSuccessful) {
+                    val forecastData = response.body()?.forecast?.forecastDayList ?: emptyList()
+                    weatherAdapter.setData(forecastData)
+                    Log.d("MainActivity", "Weather data fetched successfully. Count: ${forecastData.size}")
+                } else {
+                    Log.e("MainActivity", "Weather data request failed. Code: ${response.code()}")
+                }
+            }
+
+            override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
+                Log.e("MainActivity", "Weather data request failed.", t)
+            }
+        })
     }
 }
+
 
